@@ -4,12 +4,6 @@
 #include "gstnvdsmeta.h"
 #include "nvdsmeta.h"
 
-static const char *class_names[] = {
-    "car",
-    "bicycle",
-    "person",
-    "road_sign"
-};
 
 static void
 pad_added_handler(GstElement *src, GstPad *new_pad, gpointer user_data)
@@ -98,6 +92,47 @@ pad_added_handler(GstElement *src, GstPad *new_pad, gpointer user_data)
     gst_caps_unref(caps);
 }
 
+//type of animals
+static const char *
+get_animal_name(gint class_id)
+{
+    switch (class_id)
+    {
+        case 14:
+            return "bird";
+
+        case 15:
+            return "cat";
+
+        case 16:
+            return "dog";
+
+        case 17:
+            return "horse";
+
+        case 18:
+            return "sheep";
+
+        case 19:
+            return "cow";
+
+        case 20:
+            return "elephant";
+
+        case 21:
+            return "bear";
+
+        case 22:
+            return "zebra";
+
+        case 23:
+            return "giraffe";
+
+        default:
+            return NULL;
+    }
+}
+
 static GstPadProbeReturn
 pgie_src_pad_buffer_probe(
     GstPad *pad,
@@ -135,13 +170,14 @@ pgie_src_pad_buffer_probe(
 
             gint class_id = object_meta->class_id;
 
-            if (class_id >= 0 && class_id < 4)
-            {
+            const char *animal_name =
+                 get_animal_name(class_id);
+
+            if (animal_name != NULL){
                 g_print(
-                    "Detected: %s | Confidence: %.2f\n",
-                    class_names[class_id],
-                    object_meta->confidence
-                );
+                    "Animal Detected: %s | Confidence: %.2f\n",
+                    animal_name,
+                    object_meta->confidence);
             }
         }
     }
@@ -216,7 +252,7 @@ int main(int argc, char *argv[])
     g_object_set(
         G_OBJECT(pgie),
         "config-file-path",
-        "config/pgie_config.txt",
+        "config/pgie_yolo_config.txt",
         NULL
     );
 
@@ -240,7 +276,7 @@ int main(int argc, char *argv[])
 
         return -1;
     }
-    
+
 
     GstPad *pgie_src_pad =
     gst_element_get_static_pad(pgie, "src");

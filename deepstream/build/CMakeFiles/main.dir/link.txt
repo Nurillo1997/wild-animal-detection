@@ -1,1 +1,0 @@
-/usr/bin/cc CMakeFiles/main.dir/src/main.c.o -o main   -L/opt/nvidia/deepstream/deepstream-9.1/lib  -Wl,-rpath,/opt/nvidia/deepstream/deepstream-9.1/lib -lgstvideo-1.0 -lgstbase-1.0 -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0 -lnvdsgst_meta -lnvds_meta 

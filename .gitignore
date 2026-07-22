@@ -1,0 +1,47 @@
+# Build
+build/
+deepstream/build/
+
+# IDE
+.vscode/
+
+# Videos
+videos/*.mp4
+videos/*.mkv
+videos/*.avi
+
+# TensorRT generated engines
+*.engine
+*.onnx
+
+# Logs
+*.log
+
+#venv
+.venv/
+# Python virtual environments
+.venv/
+.venvl/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Training / inference outputs
+runs/
+
+# Model weights and large generated model files
+*.pt
+*.onnx
+*.onnx.data
+
+# Shared libraries and compiled objects
+*.so
+*.o
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile

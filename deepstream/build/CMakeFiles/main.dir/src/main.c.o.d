@@ -266,4 +266,62 @@ CMakeFiles/main.dir/src/main.c.o: \
  /usr/include/x86_64-linux-gnu/bits/types/FILE.h \
  /usr/include/x86_64-linux-gnu/bits/types/struct_FILE.h \
  /usr/include/x86_64-linux-gnu/bits/types/cookie_io_functions_t.h \
- /usr/include/x86_64-linux-gnu/bits/stdio_lim.h
+ /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
+ /opt/nvidia/deepstream/deepstream-9.1/sources/includes/gstnvdsmeta.h \
+ /usr/include/gstreamer-1.0/gst/video/video.h \
+ /usr/include/gstreamer-1.0/gst/video/video-prelude.h \
+ /usr/include/gstreamer-1.0/gst/video/video-format.h \
+ /usr/include/gstreamer-1.0/gst/video/video-enumtypes.h \
+ /usr/include/gstreamer-1.0/gst/video/video-tile.h \
+ /usr/include/gstreamer-1.0/gst/video/video-chroma.h \
+ /usr/include/gstreamer-1.0/gst/video/video-color.h \
+ /usr/include/gstreamer-1.0/gst/video/video-dither.h \
+ /usr/include/gstreamer-1.0/gst/video/video-info.h \
+ /usr/include/gstreamer-1.0/gst/video/video-frame.h \
+ /usr/include/gstreamer-1.0/gst/video/video-converter.h \
+ /usr/include/gstreamer-1.0/gst/video/video-scaler.h \
+ /usr/include/gstreamer-1.0/gst/video/video-resampler.h \
+ /usr/include/gstreamer-1.0/gst/video/video-multiview.h \
+ /usr/include/gstreamer-1.0/gst/video/video-info-dma.h \
+ /usr/include/gstreamer-1.0/gst/video/colorbalancechannel.h \
+ /usr/include/gstreamer-1.0/gst/video/colorbalance.h \
+ /usr/include/gstreamer-1.0/gst/video/gstvideoaffinetransformationmeta.h \
+ /usr/include/gstreamer-1.0/gst/video/gstvideoaggregator.h \
+ /usr/include/gstreamer-1.0/gst/base/gstaggregator.h \
+ /usr/include/gstreamer-1.0/gst/base/base-prelude.h \
+ /usr/include/gstreamer-1.0/gst/video/gstvideocodecalphameta.h \
+ /usr/include/gstreamer-1.0/gst/video/gstvideodecoder.h \
+ /usr/include/gstreamer-1.0/gst/base/gstadapter.h \
+ /usr/include/gstreamer-1.0/gst/video/gstvideoutils.h \
+ /usr/include/gstreamer-1.0/gst/video/video-hdr.h \
+ /usr/include/gstreamer-1.0/gst/video/gstvideoencoder.h \
+ /usr/include/gstreamer-1.0/gst/video/gstvideofilter.h \
+ /usr/include/gstreamer-1.0/gst/base/gstbasetransform.h \
+ /usr/include/gstreamer-1.0/gst/video/gstvideometa.h \
+ /usr/include/gstreamer-1.0/gst/video/gstvideotimecode.h \
+ /usr/include/gstreamer-1.0/gst/video/gstvideopool.h \
+ /usr/include/gstreamer-1.0/gst/video/gstvideosink.h \
+ /usr/include/gstreamer-1.0/gst/base/gstbasesink.h \
+ /usr/include/gstreamer-1.0/gst/video/navigation.h \
+ /usr/include/gstreamer-1.0/gst/video/video-anc.h \
+ /usr/include/gstreamer-1.0/gst/video/video-blend.h \
+ /usr/include/gstreamer-1.0/gst/video/videodirection.h \
+ /usr/include/gstreamer-1.0/gst/video/video-event.h \
+ /usr/include/gstreamer-1.0/gst/video/videoorientation.h \
+ /usr/include/gstreamer-1.0/gst/video/video-overlay-composition.h \
+ /usr/include/gstreamer-1.0/gst/video/videooverlay.h \
+ /usr/include/gstreamer-1.0/gst/video/video-sei.h \
+ /opt/nvidia/deepstream/deepstream-9.1/sources/includes/nvdsmeta.h \
+ /usr/lib/gcc/x86_64-linux-gnu/13/include/stdbool.h \
+ /usr/include/glib-2.0/gmodule.h \
+ /usr/include/glib-2.0/gmodule/gmodule-visibility.h \
+ /opt/nvidia/deepstream/deepstream-9.1/sources/includes/nvll_osd_struct.h \
+ /opt/nvidia/deepstream/deepstream-9.1/sources/includes/nvds_roi_meta.h \
+ /opt/nvidia/deepstream/deepstream-9.1/sources/includes/nvds_audio_meta.h \
+ /opt/nvidia/deepstream/deepstream-9.1/sources/includes/nvdsmeta.h \
+ /opt/nvidia/deepstream/deepstream-9.1/sources/includes/nvbufaudio.h \
+ /usr/lib/gcc/x86_64-linux-gnu/13/include/stdint.h /usr/include/stdint.h \
+ /usr/include/x86_64-linux-gnu/bits/wchar.h \
+ /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
+ /usr/include/x86_64-linux-gnu/bits/stdint-least.h \
+ /opt/nvidia/deepstream/deepstream-9.1/sources/includes/nvds_latency_meta.h

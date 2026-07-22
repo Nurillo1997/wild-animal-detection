@@ -1,0 +1,3 @@
+/home/zehnmindai/Developer/wild-animal-detection/deepstream/build/CMakeFiles/main.dir
+/home/zehnmindai/Developer/wild-animal-detection/deepstream/build/CMakeFiles/edit_cache.dir
+/home/zehnmindai/Developer/wild-animal-detection/deepstream/build/CMakeFiles/rebuild_cache.dir

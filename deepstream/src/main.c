@@ -95,7 +95,122 @@ pad_added_handler(GstElement *src, GstPad *new_pad, gpointer user_data)
     gst_caps_unref(caps);
 }
 
+//tracking holatini saqalaydigan struct
+#define MAX_TRACKED_OBJECTS 1000
+#define MIN_CONFIRMATION_FRAMES 5
 
+typedef struct
+{
+    guint64 tracker_id;
+    guint detection_count;
+    gboolean event_sent;
+} TrackedAnimalState;
+
+static TrackedAnimalState tracked_animals[MAX_TRACKED_OBJECTS];
+static guint tracked_animal_count = 0;
+
+//struct
+typedef struct
+{
+    const char *animal_name;
+    guint64 tracker_id;
+    gfloat confidence;
+    guint source_id;
+    guint64 frame_number;
+} AnimalDetectionEvent;
+
+//event calling function
+static void
+print_animal_event(const AnimalDetectionEvent *event)
+{
+    if (!event)
+    {
+        return;
+    }
+
+    g_print(
+        "\n"
+        "=== ANIMAL DETECTION EVENT ===\n"
+        "Animal: %s\n"
+        "Tracker ID: %" G_GUINT64_FORMAT "\n"
+        "Confidence: %.2f\n"
+        "Source ID: %u\n"
+        "Frame Number: %" G_GUINT64_FORMAT "\n"
+        "==============================\n",
+        event->animal_name,
+        event->tracker_id,
+        event->confidence,
+        event->source_id,
+        event->frame_number
+    );
+}
+
+//Tracker ID bo‘yicha state topadigan funksiya
+static TrackedAnimalState *
+get_or_create_tracked_animal(guint64 tracker_id)
+{
+    for (guint i = 0; i < tracked_animal_count; i++)
+    {
+        if (tracked_animals[i].tracker_id == tracker_id)
+        {
+            return &tracked_animals[i];
+        }
+    }
+
+    if (tracked_animal_count >= MAX_TRACKED_OBJECTS)
+    {
+        return NULL;
+    }
+
+    TrackedAnimalState *state =
+        &tracked_animals[tracked_animal_count++];
+
+    state->tracker_id = tracker_id;
+    state->detection_count = 0;
+    state->event_sent = FALSE;
+
+    return state;
+}
+
+static gfloat
+get_animal_confidence_threshold(gint class_id)
+{
+    switch (class_id)
+    {
+        case 14: /* bird */
+            return 0.50f;
+
+        case 15: /* cat */
+            return 0.70f;
+
+        case 16: /* dog */
+            return 0.75f;
+
+        case 17: /* horse */
+            return 0.70f;
+
+        case 18: /* sheep */
+            return 0.70f;
+
+        case 19: /* cow */
+            return 0.70f;
+
+        case 20: /* elephant */
+            return 0.70f;
+
+        case 21: /* bear */
+            return 0.70f;
+
+        case 22: /* zebra */
+            return 0.70f;
+
+        case 23: /* giraffe */
+            return 0.70f;
+
+        default:
+            return 1.0f;
+    }
+}
 
 //type of animals
 static const char *
@@ -174,7 +289,6 @@ pgie_src_pad_buffer_probe(
                 (NvDsObjectMeta *)object_list->data;
 
             gint class_id = object_meta->class_id;
-//test
 
 
             const char *animal_name =
@@ -182,31 +296,40 @@ pgie_src_pad_buffer_probe(
 
             if (animal_name != NULL)
 {
-    guint64 tracker_id = object_meta->object_id;
+    gfloat confidence_threshold =
+        get_animal_confidence_threshold(class_id);
 
-    gpointer key =
-        GSIZE_TO_POINTER((gsize)tracker_id);
-
-    if (!g_hash_table_contains(
-            seen_animal_ids,
-            key))
+    if (object_meta->confidence < confidence_threshold)
     {
-        g_hash_table_add(
-            seen_animal_ids,
-            key
-        );
+        continue;
+    }
 
-        g_print(
-            "\nNEW ANIMAL DETECTED\n"
-            "Animal: %s\n"
-            "Tracker ID: %" G_GUINT64_FORMAT "\n"
-            "Confidence: %.2f\n\n",
-            animal_name,
-            tracker_id,
-            object_meta->confidence
-        );
+    TrackedAnimalState *state =
+        get_or_create_tracked_animal(object_meta->object_id);
+
+    if (state != NULL)
+    {
+        state->detection_count++;
+
+        if (!state->event_sent &&
+            state->detection_count >= MIN_CONFIRMATION_FRAMES)
+        {
+            AnimalDetectionEvent event = {
+                .animal_name = animal_name,
+                .tracker_id = object_meta->object_id,
+                .confidence = object_meta->confidence,
+                .source_id = frame_meta->source_id,
+                .frame_number = frame_meta->frame_num
+            };
+
+            print_animal_event(&event);
+
+            state->event_sent = TRUE;
+        }
     }
 }
+
+
         }
     }
 

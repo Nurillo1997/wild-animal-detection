@@ -5,6 +5,14 @@ from fastapi import (
     WebSocketDisconnect,
 )
 
+from fastapi.middleware.cors import (
+    CORSMiddleware,
+)
+
+from fastapi.staticfiles import (
+    StaticFiles,
+)
+
 from sqlalchemy.orm import Session
 
 from app.database import (
@@ -13,31 +21,43 @@ from app.database import (
     get_db,
 )
 
-from app.models import DetectionEvent
+from app.models import (
+    DetectionEvent,
+)
 
 from app.schemas import (
     AnimalDetectionEvent,
     DetectionEventResponse,
+    StreamLifecycleEvent,
 )
 
-from app.websocket_manager import manager
-
-from fastapi.middleware.cors import CORSMiddleware
-
-from fastapi.staticfiles import StaticFiles
+from app.websocket_manager import (
+    manager,
+)
 
 
-
+# ============================================================
+# Database
+# ============================================================
 
 Base.metadata.create_all(
     bind=engine
 )
 
 
+# ============================================================
+# FastAPI Application
+# ============================================================
+
 app = FastAPI(
     title="Wild Animal Detection API",
     version="1.0.0",
 )
+
+
+# ============================================================
+# CORS
+# ============================================================
 
 app.add_middleware(
     CORSMiddleware,
@@ -50,12 +70,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ============================================================
+# Static HLS Files
+# ============================================================
+
 app.mount(
     "/static",
-    StaticFiles(directory="static"),
+    StaticFiles(
+        directory="static"
+    ),
     name="static",
 )
 
+
+# ============================================================
+# Root
+# ============================================================
 
 @app.get("/")
 def root():
@@ -65,97 +96,237 @@ def root():
     }
 
 
+# ============================================================
+# Stream Lifecycle
+# ============================================================
+
+@app.post("/stream/start")
+async def stream_start():
+
+    print(
+        "DeepStream stream started"
+    )
+
+    message = {
+        "event_type":
+        "stream_started"
+    }
+
+    await manager.broadcast(
+        message
+    )
+
+    return {
+        "status": "ok",
+        "event_type":
+        "stream_started",
+    }
+
+
+@app.post("/stream/stop")
+async def stream_stop():
+
+    print(
+        "DeepStream stream stopped"
+    )
+
+    message = {
+        "event_type":
+        "stream_stopped"
+    }
+
+    await manager.broadcast(
+        message
+    )
+
+    return {
+        "status": "ok",
+        "event_type":
+        "stream_stopped",
+    }
+
+
+# ============================================================
+# Detection Events
+# ============================================================
+
 @app.post(
     "/events",
-    response_model=DetectionEventResponse,
+    response_model=
+        DetectionEventResponse,
     status_code=201,
 )
 async def create_event(
-    event: AnimalDetectionEvent,
-    db: Session = Depends(get_db),
+    event:
+        AnimalDetectionEvent,
+    db:
+        Session =
+        Depends(
+            get_db
+        ),
 ):
-    # Save event to database
+
+    # --------------------------------------------------------
+    # Save detection event
+    # --------------------------------------------------------
+
     db_event = DetectionEvent(
-        event_type=event.event_type,
-        animal=event.animal,
-        tracker_id=event.tracker_id,
-        confidence=event.confidence,
-        source_id=event.source_id,
-        frame_number=event.frame_number,
-        detected_at=event.detected_at,
+        event_type=
+            event.event_type,
+
+        animal=
+            event.animal,
+
+        tracker_id=
+            event.tracker_id,
+
+        confidence=
+            event.confidence,
+
+        source_id=
+            event.source_id,
+
+        frame_number=
+            event.frame_number,
+
+        video_timestamp=
+            event.video_timestamp,
+
+        detected_at=
+            event.detected_at,
     )
 
-    db.add(db_event)
+
+    db.add(
+        db_event
+    )
+
     db.commit()
-    db.refresh(db_event)
+
+    db.refresh(
+        db_event
+    )
+
 
     print(
         f"Event saved: "
         f"{db_event.animal} | "
-        f"source={db_event.source_id} | "
-        f"tracker={db_event.tracker_id}"
+        f"source="
+        f"{db_event.source_id} | "
+        f"tracker="
+        f"{db_event.tracker_id} | "
+        f"video_timestamp="
+        f"{db_event.video_timestamp:.3f}s"
     )
 
-    # Convert SQLAlchemy object
-    # into Pydantic response model
+
+    # --------------------------------------------------------
+    # Convert SQLAlchemy model
+    # into Pydantic response
+    # --------------------------------------------------------
+
     response_event = (
-        DetectionEventResponse.model_validate(
+        DetectionEventResponse
+        .model_validate(
             db_event
         )
     )
 
-    # Broadcast new event to all
-    # connected WebSocket clients
+
+    # --------------------------------------------------------
+    # Broadcast detection event
+    # --------------------------------------------------------
+
     await manager.broadcast(
+
         response_event.model_dump(
             mode="json"
         )
+
     )
+
 
     return db_event
 
 
+# ============================================================
+# Detection History
+# ============================================================
+
 @app.get(
     "/events/history",
-    response_model=list[DetectionEventResponse],
+    response_model=
+        list[
+            DetectionEventResponse
+        ],
 )
 def get_event_history(
-    db: Session = Depends(get_db),
+    db:
+        Session =
+        Depends(
+            get_db
+        ),
 ):
+
     events = (
-        db.query(DetectionEvent)
-        .order_by(
-            DetectionEvent.detected_at.desc(),
-            DetectionEvent.id.desc(),
+
+        db.query(
+            DetectionEvent
         )
+
+        .order_by(
+
+            DetectionEvent
+            .detected_at
+            .desc(),
+
+            DetectionEvent
+            .id
+            .desc(),
+
+        )
+
         .all()
+
     )
+
 
     return events
 
 
+# ============================================================
+# WebSocket
+# ============================================================
+
 @app.websocket("/ws")
 async def websocket_endpoint(
-    websocket: WebSocket,
+    websocket:
+        WebSocket,
 ):
+
     await manager.connect(
         websocket
     )
+
 
     print(
         "WebSocket client connected"
     )
 
+
     try:
+
         while True:
-            # Keep connection alive and
-            # detect client disconnect.
+
             await websocket.receive_text()
 
+
     except WebSocketDisconnect:
+
         manager.disconnect(
             websocket
         )
+
 
         print(
             "WebSocket client disconnected"

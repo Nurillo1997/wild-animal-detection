@@ -1,7 +1,16 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import (
+    DateTime,
+    Float,
+    Integer,
+    String,
+)
+
+from sqlalchemy.orm import (
+    Mapped,
+    mapped_column,
+)
 
 from app.database import Base
 
@@ -44,6 +53,14 @@ class DetectionEvent(Base):
 
     frame_number: Mapped[int] = mapped_column(
         Integer,
+        nullable=False,
+    )
+
+    # Video presentation timestamp
+    # received from DeepStream.
+    # Stored in seconds.
+    video_timestamp: Mapped[float] = mapped_column(
+        Float,
         nullable=False,
     )
 

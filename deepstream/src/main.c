@@ -506,25 +506,35 @@ tracker_src_pad_buffer_probe(
                     MIN_CONFIRMATION_FRAMES)
             {
                 AnimalDetectionEvent event =
-                {
-                    .animal_name =
-                        animal_name,
+{
+    .animal_name =
+        animal_name,
 
-                    .tracker_id =
-                        object_meta->object_id,
+    .tracker_id =
+        object_meta->object_id,
 
-                    .confidence =
-                        object_meta->confidence,
+    .confidence =
+        object_meta->confidence,
 
-                    .source_id =
-                        frame_meta->source_id,
+    .source_id =
+        frame_meta->source_id,
 
-                    .frame_number =
-                        frame_meta->frame_num,
+    .frame_number =
+        frame_meta->frame_num,
 
-                    .detected_at =
-                        time(NULL)
-                };
+    /*
+     * Convert DeepStream/GStreamer PTS
+     * from nanoseconds to seconds.
+     */
+    .video_timestamp =
+        (frame_meta->buf_pts != GST_CLOCK_TIME_NONE)
+            ? (gdouble)frame_meta->buf_pts /
+              (gdouble)GST_SECOND
+            : 0.0,
+
+    .detected_at =
+        time(NULL)
+};
 
 
                 /*
@@ -1225,26 +1235,54 @@ main(
 
 
     if (state_return ==
-        GST_STATE_CHANGE_FAILURE)
-    {
-        g_printerr(
-            "Failed to start pipeline.\n"
-        );
+    GST_STATE_CHANGE_FAILURE)
+{
+    g_printerr(
+        "Failed to start pipeline.\n"
+    );
 
 
-        gst_element_set_state(
-            pipeline,
-            GST_STATE_NULL
-        );
+    gst_element_set_state(
+        pipeline,
+        GST_STATE_NULL
+    );
 
 
-        gst_object_unref(
-            pipeline
-        );
+    gst_object_unref(
+        pipeline
+    );
 
 
-        return -1;
-    }
+    return -1;
+}
+
+
+/*
+ * Pipeline has successfully
+ * accepted the PLAYING state.
+ *
+ * Notify FastAPI that a new
+ * DeepStream session has started.
+ *
+ * FastAPI will broadcast:
+ *
+ * {
+ *     "event_type":
+ *     "stream_started"
+ * }
+ *
+ * through WebSocket.
+ */
+if (!animal_stream_start())
+{
+    g_printerr(
+        "Warning: "
+        "Failed to notify backend "
+        "about stream start.\n"
+    );
+}
+
+
 
 
     /*
@@ -1344,14 +1382,47 @@ main(
 
 
     /*
-     * Cleanup.
-     */
-    if (bus)
-    {
-        gst_object_unref(
-            bus
-        );
-    }
+ * Notify FastAPI that this
+ * DeepStream streaming session
+ * has finished.
+ *
+ * This happens after either:
+ *
+ * - EOS
+ * - pipeline ERROR
+ *
+ * FastAPI will broadcast:
+ *
+ * {
+ *     "event_type":
+ *     "stream_stopped"
+ * }
+ */
+if (!animal_stream_stop())
+{
+    g_printerr(
+        "Warning: "
+        "Failed to notify backend "
+        "about stream stop.\n"
+    );
+}
+
+
+/*
+ * Cleanup.
+ */
+if (bus)
+{
+    gst_object_unref(
+        bus
+    );
+}
+
+
+gst_element_set_state(
+    pipeline,
+    GST_STATE_NULL
+);
 
 
     gst_element_set_state(

@@ -49,7 +49,6 @@ DeepStream-Yolo/
 
 
 backend/.venv/
-backend/wildlife.db
 
 backend/.venv/
 backend/wildlife.db

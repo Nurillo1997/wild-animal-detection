@@ -454,8 +454,6 @@ SourceContext source_contexts[NUM_SOURCES];
     return -1;
 }
 
-    
-
     /* Configure video source */
     const gchar *source_uris[NUM_SOURCES] = {
     "file:///home/zehnmindai/Developer/wild-animal-detection/videos/video1.mp4",

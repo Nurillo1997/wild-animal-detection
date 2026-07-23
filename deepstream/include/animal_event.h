@@ -7,11 +7,11 @@
 typedef struct
 {
     const char *animal_name;
-    guint64 tracker_id;
-    gfloat confidence;
-    guint source_id;
-    guint64 frame_number;
-    time_t detected_at;
+    guint64     tracker_id;
+    gfloat      confidence;
+    guint       source_id;
+    guint64     frame_number;
+    time_t      detected_at;
 } AnimalDetectionEvent;
 
 /*
@@ -25,7 +25,18 @@ char *animal_event_to_json(
 );
 
 /*
- * Handles a completed animal detection event.
+ * Sends the event JSON to the FastAPI backend
+ * via HTTP POST using libcurl.
+ *
+ * Returns TRUE on success, FALSE on failure.
+ */
+gboolean animal_event_post(
+    const char *json
+);
+
+/*
+ * Handles a completed animal detection event:
+ * logs to stdout and POSTs to the backend.
  */
 void handle_animal_event(
     const AnimalDetectionEvent *event

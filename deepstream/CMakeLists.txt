@@ -21,6 +21,9 @@ pkg_check_modules(GSTREAMER REQUIRED
     gstreamer-video-1.0
 )
 
+# libcurl for HTTP POST to FastAPI
+find_package(CURL REQUIRED)
+
 
 # ============================================================
 # DeepStream
@@ -55,6 +58,9 @@ target_include_directories(main PRIVATE
 
     # DeepStream headers
     ${DEEPSTREAM_DIR}/sources/includes
+
+    # libcurl headers
+    ${CURL_INCLUDE_DIRS}
 )
 
 
@@ -93,4 +99,7 @@ target_link_libraries(main PRIVATE
     # DeepStream
     nvdsgst_meta
     nvds_meta
+
+    # libcurl (HTTP POST)
+    ${CURL_LIBRARIES}
 )

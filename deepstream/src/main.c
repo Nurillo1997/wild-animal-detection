@@ -1,8 +1,11 @@
+
 #include <gst/gst.h>
 #include <stdio.h>
 
 #include "gstnvdsmeta.h"
 #include "nvdsmeta.h"
+
+static GHashTable *seen_animal_ids = NULL;
 
 
 static void
@@ -92,6 +95,8 @@ pad_added_handler(GstElement *src, GstPad *new_pad, gpointer user_data)
     gst_caps_unref(caps);
 }
 
+
+
 //type of animals
 static const char *
 get_animal_name(gint class_id)
@@ -169,16 +174,39 @@ pgie_src_pad_buffer_probe(
                 (NvDsObjectMeta *)object_list->data;
 
             gint class_id = object_meta->class_id;
+//test
+
 
             const char *animal_name =
                  get_animal_name(class_id);
 
-            if (animal_name != NULL){
-                g_print(
-                    "Animal Detected: %s | Confidence: %.2f\n",
-                    animal_name,
-                    object_meta->confidence);
-            }
+            if (animal_name != NULL)
+{
+    guint64 tracker_id = object_meta->object_id;
+
+    gpointer key =
+        GSIZE_TO_POINTER((gsize)tracker_id);
+
+    if (!g_hash_table_contains(
+            seen_animal_ids,
+            key))
+    {
+        g_hash_table_add(
+            seen_animal_ids,
+            key
+        );
+
+        g_print(
+            "\nNEW ANIMAL DETECTED\n"
+            "Animal: %s\n"
+            "Tracker ID: %" G_GUINT64_FORMAT "\n"
+            "Confidence: %.2f\n\n",
+            animal_name,
+            tracker_id,
+            object_meta->confidence
+        );
+    }
+}
         }
     }
 
@@ -191,12 +219,19 @@ int main(int argc, char *argv[])
     GstElement *source = NULL;
     GstElement *streammux = NULL;
     GstElement *pgie = NULL;
+    GstElement *tracker = NULL;
     GstElement *sink = NULL;
 
     GstBus *bus = NULL;
     GstMessage *msg = NULL;
 
+
     gst_init(&argc, &argv);
+
+    seen_animal_ids = g_hash_table_new(
+        g_direct_hash,
+        g_direct_equal
+);  
 
     pipeline = gst_pipeline_new("wild-animal-detection-pipeline");
 
@@ -215,12 +250,17 @@ int main(int argc, char *argv[])
         "primary-inference"
     );
 
+    tracker = gst_element_factory_make(
+    "nvtracker",
+    "tracker"
+);
+
     sink = gst_element_factory_make(
         "fakesink",
         "sink"
     );
 
-    if (!pipeline || !source || !streammux || !pgie || !sink)
+    if (!pipeline || !source || !streammux || !pgie || !tracker || !sink)
     {
         g_printerr("Failed to create pipeline elements.\n");
 
@@ -229,6 +269,8 @@ int main(int argc, char *argv[])
 
         return -1;
     }
+
+    
 
     /* Configure video source */
     g_object_set(
@@ -240,36 +282,51 @@ int main(int argc, char *argv[])
 
     /* Configure nvstreammux */
     g_object_set(
-        G_OBJECT(streammux),
-        "batch-size", 1,
-        "width", 1280,
-        "height", 720,
-        "batched-push-timeout", 40000,
-        NULL
-    );
+    G_OBJECT(streammux),
+    "batch-size", 1,
+    "width", 640,
+    "height", 640,
+    "enable-padding", TRUE,
+    "batched-push-timeout", 40000,
+    NULL
+);
 
     /* Configure inference */
     g_object_set(
         G_OBJECT(pgie),
         "config-file-path",
-        "config/pgie_yolo_config.txt",
+        "/home/zehnmindai/Developer/wild-animal-detection/config_infer_primary_yolo11.txt",
         NULL
     );
+
+    /* Configure tracker */
+g_object_set(
+    G_OBJECT(tracker),
+    "tracker-width", 640,
+    "tracker-height", 384,
+    "ll-lib-file",
+    "/opt/nvidia/deepstream/deepstream-9.1/lib/libnvds_nvmultiobjecttracker.so",
+    "ll-config-file",
+    "/opt/nvidia/deepstream/deepstream-9.1/samples/configs/deepstream-app/config_tracker_NvDCF_perf.yml",
+    NULL
+);
 
     gst_bin_add_many(
         GST_BIN(pipeline),
         source,
         streammux,
         pgie,
+        tracker,
         sink,
         NULL
     );
 
     if (!gst_element_link_many(
-            streammux,
-            pgie,
-            sink,
-            NULL))
+        streammux,
+        pgie,
+        tracker,
+        sink,
+        NULL))
     {
         g_printerr("Failed to link pipeline elements.\n");
         gst_object_unref(pipeline);
@@ -278,23 +335,24 @@ int main(int argc, char *argv[])
     }
 
 
-    GstPad *pgie_src_pad =
-    gst_element_get_static_pad(pgie, "src");
+    GstPad *tracker_src_pad =
+    gst_element_get_static_pad(tracker, "src");
 
-    if (!pgie_src_pad){
-    g_printerr("Failed to get PGIE src pad.\n");
-    }
-    else
-    {
+    if (!tracker_src_pad)
+{
+    g_printerr("Failed to get tracker src pad.\n");
+}
+else
+{
     gst_pad_add_probe(
-        pgie_src_pad,
+        tracker_src_pad,
         GST_PAD_PROBE_TYPE_BUFFER,
         pgie_src_pad_buffer_probe,
         NULL,
         NULL
     );
 
-    gst_object_unref(pgie_src_pad);
+    gst_object_unref(tracker_src_pad);
 }
 
     /*
@@ -369,6 +427,14 @@ int main(int argc, char *argv[])
     );
 
     gst_object_unref(pipeline);
+    
+    if (seen_animal_ids)
+{
+    g_hash_table_destroy(seen_animal_ids);
+    seen_animal_ids = NULL;
+}
+
+
 
     return 0;
 }

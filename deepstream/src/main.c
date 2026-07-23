@@ -13,13 +13,6 @@
 #define MIN_CONFIRMATION_FRAMES 5
 
 
-/*
- * Context passed to uridecodebin's
- * pad-added callback.
- *
- * Each source needs to know which
- * nvstreammux sink pad it belongs to.
- */
 typedef struct
 {
     GstElement *streammux;
@@ -27,13 +20,6 @@ typedef struct
 } SourceContext;
 
 
-/*
- * Keeps track of how many times
- * a tracker ID has been detected.
- *
- * An event is sent only once after
- * MIN_CONFIRMATION_FRAMES detections.
- */
 typedef struct
 {
     guint64 tracker_id;
@@ -49,8 +35,8 @@ static guint tracked_animal_count = 0;
 
 
 /*
- * Find an existing tracker state or
- * create a new one.
+ * Find existing tracked animal state
+ * or create a new one.
  */
 static TrackedAnimalState *
 get_or_create_tracked_animal(
@@ -67,6 +53,7 @@ get_or_create_tracked_animal(
         }
     }
 
+
     if (tracked_animal_count >=
         MAX_TRACKED_OBJECTS)
     {
@@ -77,10 +64,12 @@ get_or_create_tracked_animal(
         return NULL;
     }
 
+
     TrackedAnimalState *state =
         &tracked_animals[
             tracked_animal_count++
         ];
+
 
     state->tracker_id =
         tracker_id;
@@ -91,13 +80,14 @@ get_or_create_tracked_animal(
     state->event_sent =
         FALSE;
 
+
     return state;
 }
 
 
 /*
- * Confidence threshold for each
- * supported animal class.
+ * Confidence threshold for
+ * supported animal classes.
  */
 static gfloat
 get_animal_confidence_threshold(
@@ -142,8 +132,8 @@ get_animal_confidence_threshold(
 
 
 /*
- * Convert COCO class ID into
- * supported animal name.
+ * Convert COCO class ID
+ * into animal name.
  */
 static const char *
 get_animal_name(
@@ -188,15 +178,10 @@ get_animal_name(
 
 
 /*
- * uridecodebin creates source pads
- * dynamically.
+ * uridecodebin creates pads dynamically.
  *
- * This callback connects each decoded
- * video stream to its corresponding
- * nvstreammux sink pad.
- *
- * Source 0 -> sink_0
- * Source 1 -> sink_1
+ * Connect each decoded video source
+ * to its corresponding nvstreammux pad.
  */
 static void
 pad_added_handler(
@@ -206,31 +191,24 @@ pad_added_handler(
 {
     (void)src;
 
+
     SourceContext *context =
         (SourceContext *)user_data;
+
 
     GstElement *streammux =
         context->streammux;
 
+
     guint source_id =
         context->source_id;
 
-    GstCaps *caps = NULL;
 
-    const GstStructure *structure =
-        NULL;
-
-    const gchar *name =
-        NULL;
-
-    GstPad *sink_pad =
-        NULL;
-
-
-    caps =
+    GstCaps *caps =
         gst_pad_get_current_caps(
             new_pad
         );
+
 
     if (!caps)
     {
@@ -240,6 +218,7 @@ pad_added_handler(
                 NULL
             );
     }
+
 
     if (!caps)
     {
@@ -253,29 +232,29 @@ pad_added_handler(
     }
 
 
-    structure =
+    const GstStructure *structure =
         gst_caps_get_structure(
             caps,
             0
         );
 
-    name =
+
+    const gchar *name =
         gst_structure_get_name(
             structure
         );
 
 
     /*
-     * uridecodebin may expose
-     * video and audio pads.
-     *
-     * Only connect video.
+     * Ignore audio pads.
      */
     if (!g_str_has_prefix(
             name,
             "video/"))
     {
-        gst_caps_unref(caps);
+        gst_caps_unref(
+            caps
+        );
 
         return;
     }
@@ -291,6 +270,7 @@ pad_added_handler(
 
     gchar pad_name[32];
 
+
     g_snprintf(
         pad_name,
         sizeof(pad_name),
@@ -299,7 +279,7 @@ pad_added_handler(
     );
 
 
-    sink_pad =
+    GstPad *sink_pad =
         gst_element_request_pad_simple(
             streammux,
             pad_name
@@ -316,7 +296,11 @@ pad_added_handler(
             pad_name
         );
 
-        gst_caps_unref(caps);
+
+        gst_caps_unref(
+            caps
+        );
+
 
         return;
     }
@@ -332,13 +316,16 @@ pad_added_handler(
             pad_name
         );
 
+
         gst_object_unref(
             sink_pad
         );
 
+
         gst_caps_unref(
             caps
         );
+
 
         return;
     }
@@ -379,6 +366,7 @@ pad_added_handler(
         sink_pad
     );
 
+
     gst_caps_unref(
         caps
     );
@@ -386,11 +374,12 @@ pad_added_handler(
 
 
 /*
- * Pad probe attached after NvTracker.
+ * Probe after NvTracker.
  *
- * Reads DeepStream metadata and
- * generates AnimalDetectionEvent
- * objects for confirmed animals.
+ * Reads DeepStream metadata,
+ * filters animal detections,
+ * confirms tracker persistence,
+ * and sends events to FastAPI.
  */
 static GstPadProbeReturn
 tracker_src_pad_buffer_probe(
@@ -427,8 +416,8 @@ tracker_src_pad_buffer_probe(
 
 
     /*
-     * Iterate over every frame
-     * in the current batch.
+     * Iterate through frames
+     * in the batch.
      */
     for (NvDsMetaList *frame_list =
              batch_meta->frame_meta_list;
@@ -442,8 +431,8 @@ tracker_src_pad_buffer_probe(
 
 
         /*
-         * Iterate over detected
-         * objects in the frame.
+         * Iterate through objects
+         * detected in the frame.
          */
         for (NvDsMetaList *object_list =
                  frame_meta->obj_meta_list;
@@ -467,8 +456,7 @@ tracker_src_pad_buffer_probe(
 
 
             /*
-             * Ignore non-animal
-             * COCO classes.
+             * Ignore non-animal classes.
              */
             if (animal_name == NULL)
             {
@@ -509,9 +497,9 @@ tracker_src_pad_buffer_probe(
 
 
             /*
-             * Generate only one event
-             * for each confirmed
-             * tracker ID.
+             * Send only one event after
+             * the object has been detected
+             * for enough frames.
              */
             if (!state->event_sent &&
                 state->detection_count >=
@@ -542,9 +530,8 @@ tracker_src_pad_buffer_probe(
                 /*
                  * animal_event.c:
                  *
-                 * 1. Converts event to JSON
-                 * 2. Prints event
-                 * 3. POSTs JSON to FastAPI
+                 * Event -> JSON
+                 * JSON -> FastAPI POST /events
                  */
                 handle_animal_event(
                     &event
@@ -570,34 +557,62 @@ main(
     GstElement *pipeline =
         NULL;
 
+
     GstElement *sources[
         NUM_SOURCES
     ] = {NULL};
 
+
     GstElement *streammux =
         NULL;
+
 
     GstElement *pgie =
         NULL;
 
+
     GstElement *tracker =
         NULL;
+
 
     GstElement *tiler =
         NULL;
 
+
     GstElement *converter =
         NULL;
+
 
     GstElement *osd =
         NULL;
 
-    GstElement *sink =
+
+    /*
+     * HLS output elements.
+     */
+    GstElement *post_osd_converter =
+        NULL;
+
+
+    GstElement *encoder =
+        NULL;
+
+
+    GstElement *parser =
+        NULL;
+
+
+    GstElement *muxer =
+        NULL;
+
+
+    GstElement *hls_sink =
         NULL;
 
 
     GstBus *bus =
         NULL;
+
 
     GstMessage *msg =
         NULL;
@@ -639,13 +654,14 @@ main(
 
     /*
      * Create one uridecodebin
-     * for every video source.
+     * per video source.
      */
     for (guint i = 0;
          i < NUM_SOURCES;
          i++)
     {
         gchar source_name[32];
+
 
         g_snprintf(
             source_name,
@@ -670,9 +686,11 @@ main(
                 i
             );
 
+
             gst_object_unref(
                 pipeline
             );
+
 
             return -1;
         }
@@ -724,16 +742,58 @@ main(
         );
 
 
-    sink =
+    /*
+     * Create HLS output elements.
+     *
+     * OSD
+     *  ↓
+     * nvvideoconvert
+     *  ↓
+     * nvv4l2h264enc
+     *  ↓
+     * h264parse
+     *  ↓
+     * mpegtsmux
+     *  ↓
+     * hlssink
+     */
+    post_osd_converter =
         gst_element_factory_make(
-            "nveglglessink",
-            "video-sink"
+            "nvvideoconvert",
+            "post-osd-converter"
+        );
+
+
+    encoder =
+        gst_element_factory_make(
+            "nvv4l2h264enc",
+            "h264-encoder"
+        );
+
+
+    parser =
+        gst_element_factory_make(
+            "h264parse",
+            "h264-parser"
+        );
+
+
+    muxer =
+        gst_element_factory_make(
+            "mpegtsmux",
+            "mpegts-muxer"
+        );
+
+
+    hls_sink =
+        gst_element_factory_make(
+            "hlssink",
+            "hls-sink"
         );
 
 
     /*
-     * Verify that every required
-     * element was created.
+     * Verify pipeline elements.
      */
     if (!streammux ||
         !pgie ||
@@ -741,23 +801,29 @@ main(
         !tiler ||
         !converter ||
         !osd ||
-        !sink)
+        !post_osd_converter ||
+        !encoder ||
+        !parser ||
+        !muxer ||
+        !hls_sink)
     {
         g_printerr(
             "Failed to create "
             "pipeline elements.\n"
         );
 
+
         gst_object_unref(
             pipeline
         );
+
 
         return -1;
     }
 
 
     /*
-     * Input video files.
+     * Input MP4 files.
      */
     const gchar *source_uris[
         NUM_SOURCES
@@ -772,7 +838,7 @@ main(
 
 
     /*
-     * Configure each source.
+     * Configure sources.
      */
     for (guint i = 0;
          i < NUM_SOURCES;
@@ -793,9 +859,6 @@ main(
 
     /*
      * Configure nvstreammux.
-     *
-     * Both video streams are batched
-     * before inference.
      */
     g_object_set(
         G_OBJECT(
@@ -822,7 +885,7 @@ main(
 
 
     /*
-     * Configure YOLO11 PGIE.
+     * Configure YOLO11 inference.
      */
     g_object_set(
         G_OBJECT(
@@ -871,10 +934,8 @@ main(
 
 
     /*
-     * Configure tiler.
-     *
-     * Two sources are displayed
-     * side-by-side:
+     * Configure tiled multi-stream
+     * video output.
      *
      * +----------+----------+
      * | Source 0 | Source 1 |
@@ -902,23 +963,80 @@ main(
 
 
     /*
-     * Synchronize display with
-     * pipeline clock.
+     * Configure NVIDIA H.264 encoder.
+     *
+     * Bitrate is specified in bits/sec.
      */
     g_object_set(
         G_OBJECT(
-            sink
+            encoder
         ),
 
-        "sync",
-        TRUE,
+        "bitrate",
+        4000000,
 
         NULL
     );
 
 
     /*
-     * Add main pipeline elements.
+     * Configure HLS output.
+     *
+     * playlist.m3u8 contains
+     * references to .ts segments.
+     */
+    g_object_set(
+        G_OBJECT(
+            hls_sink
+        ),
+
+        "location",
+
+        "/home/zehnmindai/Developer/"
+        "wild-animal-detection/"
+        "backend/static/hls/"
+        "segment%05d.ts",
+
+
+        "playlist-location",
+
+        "/home/zehnmindai/Developer/"
+        "wild-animal-detection/"
+        "backend/static/hls/"
+        "playlist.m3u8",
+
+
+        /*
+         * Target HLS segment
+         * duration in seconds.
+         */
+        "target-duration",
+        2,
+
+
+        /*
+         * Keep maximum 5 segment
+         * files on disk.
+         */
+        "max-files",
+        5,
+
+
+        /*
+         * Keep 5 segments in
+         * the live playlist.
+         */
+        "playlist-length",
+        5,
+
+
+        NULL
+    );
+
+
+    /*
+     * Add DeepStream and HLS
+     * elements to pipeline.
      */
     gst_bin_add_many(
         GST_BIN(
@@ -931,7 +1049,11 @@ main(
         tiler,
         converter,
         osd,
-        sink,
+        post_osd_converter,
+        encoder,
+        parser,
+        muxer,
+        hls_sink,
 
         NULL
     );
@@ -955,7 +1077,7 @@ main(
 
 
     /*
-     * Link static DeepStream pipeline:
+     * Link static pipeline:
      *
      * nvstreammux
      *      ↓
@@ -969,7 +1091,15 @@ main(
      *      ↓
      * nvdsosd
      *      ↓
-     * nveglglessink
+     * nvvideoconvert
+     *      ↓
+     * nvv4l2h264enc
+     *      ↓
+     * h264parse
+     *      ↓
+     * mpegtsmux
+     *      ↓
+     * hlssink
      */
     if (!gst_element_link_many(
             streammux,
@@ -978,28 +1108,34 @@ main(
             tiler,
             converter,
             osd,
-            sink,
+            post_osd_converter,
+            encoder,
+            parser,
+            muxer,
+            hls_sink,
             NULL))
     {
         g_printerr(
             "Failed to link "
-            "pipeline elements.\n"
+            "HLS pipeline elements.\n"
         );
+
 
         gst_object_unref(
             pipeline
         );
+
 
         return -1;
     }
 
 
     /*
-     * Attach metadata probe after
-     * NvTracker.
+     * Attach detection metadata
+     * probe after NvTracker.
      *
-     * This keeps event generation
-     * independent from video display.
+     * This remains independent
+     * from the HLS output pipeline.
      */
     GstPad *tracker_src_pad =
         gst_element_get_static_pad(
@@ -1037,8 +1173,8 @@ main(
 
 
     /*
-     * Connect dynamic uridecodebin
-     * pads to nvstreammux.
+     * Connect dynamic source pads
+     * to nvstreammux.
      */
     for (guint i = 0;
          i < NUM_SOURCES;
@@ -1046,6 +1182,7 @@ main(
     {
         source_contexts[i].streammux =
             streammux;
+
 
         source_contexts[i].source_id =
             i;
@@ -1070,6 +1207,13 @@ main(
     );
 
 
+    g_print(
+        "HLS output: "
+        "backend/static/hls/"
+        "playlist.m3u8\n"
+    );
+
+
     /*
      * Start pipeline.
      */
@@ -1087,14 +1231,17 @@ main(
             "Failed to start pipeline.\n"
         );
 
+
         gst_element_set_state(
             pipeline,
             GST_STATE_NULL
         );
 
+
         gst_object_unref(
             pipeline
         );
+
 
         return -1;
     }
@@ -1133,6 +1280,7 @@ main(
                 GError *error =
                     NULL;
 
+
                 gchar *debug_info =
                     NULL;
 
@@ -1163,9 +1311,11 @@ main(
                     &error
                 );
 
+
                 g_free(
                     debug_info
                 );
+
 
                 break;
             }
@@ -1176,6 +1326,7 @@ main(
                 g_print(
                     "End of stream.\n"
                 );
+
 
                 break;
             }

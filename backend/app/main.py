@@ -24,6 +24,10 @@ from app.websocket_manager import manager
 
 from fastapi.middleware.cors import CORSMiddleware
 
+from fastapi.staticfiles import StaticFiles
+
+
+
 
 Base.metadata.create_all(
     bind=engine
@@ -44,6 +48,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+app.mount(
+    "/static",
+    StaticFiles(directory="static"),
+    name="static",
 )
 
 

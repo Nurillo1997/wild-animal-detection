@@ -8,11 +8,30 @@
 
 static GHashTable *seen_animal_ids = NULL;
 
+#define NUM_SOURCES 2
+
+//struct 
+typedef struct
+{
+    GstElement *streammux;
+    guint source_id;
+} SourceContext;
 
 static void
-pad_added_handler(GstElement *src, GstPad *new_pad, gpointer user_data)
+pad_added_handler(
+    GstElement *src,
+    GstPad *new_pad,
+    gpointer user_data)
 {
-    GstElement *streammux = GST_ELEMENT(user_data);
+    SourceContext *context =
+        (SourceContext *)user_data;
+
+    GstElement *streammux =
+        context->streammux;
+
+    guint source_id =
+        context->source_id;
+
     GstCaps *caps = NULL;
     const GstStructure *structure = NULL;
     const gchar *name = NULL;
@@ -22,21 +41,34 @@ pad_added_handler(GstElement *src, GstPad *new_pad, gpointer user_data)
 
     if (!caps)
     {
-        caps = gst_pad_query_caps(new_pad, NULL);
+        caps = gst_pad_query_caps(
+            new_pad,
+            NULL
+        );
     }
 
     if (!caps)
     {
-        g_printerr("Failed to get pad capabilities.\n");
+        g_printerr(
+            "Source %u: Failed to get pad capabilities.\n",
+            source_id
+        );
+
         return;
     }
 
-    structure = gst_caps_get_structure(caps, 0);
-    name = gst_structure_get_name(structure);
+    structure =
+        gst_caps_get_structure(caps, 0);
+
+    name =
+        gst_structure_get_name(structure);
 
     /*
-     * uridecodebin may create both video and audio pads.
-     * We only want the video stream.
+     * uridecodebin may create both
+     * video and audio pads.
+     *
+     * We only connect video pads
+     * to nvstreammux.
      */
     if (!g_str_has_prefix(name, "video/"))
     {
@@ -44,30 +76,55 @@ pad_added_handler(GstElement *src, GstPad *new_pad, gpointer user_data)
         return;
     }
 
-    g_print("Video pad detected: %s\n", name);
+    g_print(
+        "Source %u: Video pad detected: %s\n",
+        source_id,
+        name
+    );
 
     /*
-     * We have only one video source,
-     * so explicitly request sink_0.
+     * Each source gets its own
+     * nvstreammux sink pad:
+     *
+     * source 0 -> sink_0
+     * source 1 -> sink_1
+     * source 2 -> sink_2
      */
-    sink_pad = gst_element_request_pad_simple(
-        streammux,
-        "sink_0"
+    gchar pad_name[32];
+
+    g_snprintf(
+        pad_name,
+        sizeof(pad_name),
+        "sink_%u",
+        source_id
     );
+
+    sink_pad =
+        gst_element_request_pad_simple(
+            streammux,
+            pad_name
+        );
 
     if (!sink_pad)
     {
         g_printerr(
-            "Failed to get sink_0 pad from nvstreammux.\n"
+            "Source %u: Failed to get %s from nvstreammux.\n",
+            source_id,
+            pad_name
         );
 
         gst_caps_unref(caps);
+
         return;
     }
 
     if (gst_pad_is_linked(sink_pad))
     {
-        g_print("nvstreammux sink_0 is already linked.\n");
+        g_print(
+            "Source %u: %s is already linked.\n",
+            source_id,
+            pad_name
+        );
 
         gst_object_unref(sink_pad);
         gst_caps_unref(caps);
@@ -76,19 +133,26 @@ pad_added_handler(GstElement *src, GstPad *new_pad, gpointer user_data)
     }
 
     GstPadLinkReturn link_result =
-        gst_pad_link(new_pad, sink_pad);
+        gst_pad_link(
+            new_pad,
+            sink_pad
+        );
 
     if (link_result != GST_PAD_LINK_OK)
     {
         g_printerr(
-            "Failed to link decoder to nvstreammux. Error: %d\n",
+            "Source %u: Failed to link decoder to %s. Error: %d\n",
+            source_id,
+            pad_name,
             link_result
         );
     }
     else
     {
         g_print(
-            "Decoder linked to nvstreammux successfully.\n"
+            "Source %u: Decoder linked to %s successfully.\n",
+            source_id,
+            pad_name
         );
     }
 
@@ -306,7 +370,7 @@ pgie_src_pad_buffer_probe(
 int main(int argc, char *argv[])
 {
     GstElement *pipeline = NULL;
-    GstElement *source = NULL;
+    GstElement *sources[NUM_SOURCES] = {NULL};
     GstElement *streammux = NULL;
     GstElement *pgie = NULL;
     GstElement *tracker = NULL;
@@ -322,13 +386,39 @@ int main(int argc, char *argv[])
         g_direct_hash,
         g_direct_equal
 );  
+SourceContext source_contexts[NUM_SOURCES];
 
     pipeline = gst_pipeline_new("wild-animal-detection-pipeline");
 
-    source = gst_element_factory_make(
-        "uridecodebin",
-        "video-source"
+    for (guint i = 0; i < NUM_SOURCES; i++)
+{
+    gchar source_name[32];
+
+    g_snprintf(
+        source_name,
+        sizeof(source_name),
+        "video-source-%u",
+        i
     );
+
+    sources[i] =
+        gst_element_factory_make(
+            "uridecodebin",
+            source_name
+        );
+
+    if (!sources[i])
+    {
+        g_printerr(
+            "Failed to create source %u.\n",
+            i
+        );
+
+        gst_object_unref(pipeline);
+
+        return -1;
+    }
+}
 
     streammux = gst_element_factory_make(
         "nvstreammux",
@@ -350,30 +440,42 @@ int main(int argc, char *argv[])
         "sink"
     );
 
-    if (!pipeline || !source || !streammux || !pgie || !tracker || !sink)
+    if (!pipeline || !streammux || !pgie || !sink)
+{
+    g_printerr(
+        "Failed to create pipeline elements.\n"
+    );
+
+    if (pipeline)
     {
-        g_printerr("Failed to create pipeline elements.\n");
-
-        if (pipeline)
-            gst_object_unref(pipeline);
-
-        return -1;
+        gst_object_unref(pipeline);
     }
+
+    return -1;
+}
 
     
 
     /* Configure video source */
+    const gchar *source_uris[NUM_SOURCES] = {
+    "file:///home/zehnmindai/Developer/wild-animal-detection/videos/video1.mp4",
+    "file:///home/zehnmindai/Developer/wild-animal-detection/videos/video2.mp4"
+};
+
+for (guint i = 0; i < NUM_SOURCES; i++)
+{
     g_object_set(
-        G_OBJECT(source),
+        G_OBJECT(sources[i]),
         "uri",
-        "file:///home/zehnmindai/Developer/wild-animal-detection/videos/video2.mp4",
+        source_uris[i],
         NULL
     );
+}
 
     /* Configure nvstreammux */
     g_object_set(
     G_OBJECT(streammux),
-    "batch-size", 1,
+    "batch-size", NUM_SOURCES,
     "width", 640,
     "height", 640,
     "enable-padding", TRUE,
@@ -401,15 +503,21 @@ g_object_set(
     NULL
 );
 
-    gst_bin_add_many(
+   gst_bin_add_many(
+    GST_BIN(pipeline),
+    streammux,
+    pgie,
+    tracker,
+    sink,
+    NULL
+);
+for (guint i = 0; i < NUM_SOURCES; i++)
+{
+    gst_bin_add(
         GST_BIN(pipeline),
-        source,
-        streammux,
-        pgie,
-        tracker,
-        sink,
-        NULL
+        sources[i]
     );
+}
 
     if (!gst_element_link_many(
         streammux,
@@ -450,12 +558,21 @@ else
      * When the pad becomes available, pad_added_handler()
      * connects it to nvstreammux.
      */
+    for (guint i = 0; i < NUM_SOURCES; i++)
+{
+    source_contexts[i].streammux =
+        streammux;
+
+    source_contexts[i].source_id =
+        i;
+
     g_signal_connect(
-        source,
+        sources[i],
         "pad-added",
         G_CALLBACK(pad_added_handler),
-        streammux
+        &source_contexts[i]
     );
+}
 
     g_print("Starting DeepStream pipeline...\n");
 

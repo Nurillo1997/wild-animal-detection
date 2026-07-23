@@ -1,9 +1,10 @@
-
 #include <gst/gst.h>
 #include <stdio.h>
-
+#include "animal_event.h"
 #include "gstnvdsmeta.h"
 #include "nvdsmeta.h"
+
+#include <time.h>
 
 static GHashTable *seen_animal_ids = NULL;
 
@@ -109,41 +110,6 @@ typedef struct
 static TrackedAnimalState tracked_animals[MAX_TRACKED_OBJECTS];
 static guint tracked_animal_count = 0;
 
-//struct
-typedef struct
-{
-    const char *animal_name;
-    guint64 tracker_id;
-    gfloat confidence;
-    guint source_id;
-    guint64 frame_number;
-} AnimalDetectionEvent;
-
-//event calling function
-static void
-print_animal_event(const AnimalDetectionEvent *event)
-{
-    if (!event)
-    {
-        return;
-    }
-
-    g_print(
-        "\n"
-        "=== ANIMAL DETECTION EVENT ===\n"
-        "Animal: %s\n"
-        "Tracker ID: %" G_GUINT64_FORMAT "\n"
-        "Confidence: %.2f\n"
-        "Source ID: %u\n"
-        "Frame Number: %" G_GUINT64_FORMAT "\n"
-        "==============================\n",
-        event->animal_name,
-        event->tracker_id,
-        event->confidence,
-        event->source_id,
-        event->frame_number
-    );
-}
 
 //Tracker ID bo‘yicha state topadigan funksiya
 static TrackedAnimalState *
@@ -319,10 +285,11 @@ pgie_src_pad_buffer_probe(
                 .tracker_id = object_meta->object_id,
                 .confidence = object_meta->confidence,
                 .source_id = frame_meta->source_id,
-                .frame_number = frame_meta->frame_num
+                .frame_number = frame_meta->frame_num,
+                .detected_at = time(NULL)
             };
 
-            print_animal_event(&event);
+            handle_animal_event(&event);
 
             state->event_sent = TRUE;
         }

@@ -46,3 +46,7 @@ CMakeCache.txt
 cmake_install.cmake
 Makefile
 DeepStream-Yolo/
+
+
+backend/.venv/
+backend/wildlife.db
